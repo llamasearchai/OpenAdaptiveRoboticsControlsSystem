@@ -1,0 +1,32 @@
+[project]
+name = "arcs"
+version = "0.1.0"
+description = "Adaptive Robotics Control System"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "torch",
+    "gymnasium",
+    "scipy",
+    "pydantic",
+    "typer",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+arcs = "arcs.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arcs"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.mypy]
+ignore_missing_imports = true
+python_version = "3.9"

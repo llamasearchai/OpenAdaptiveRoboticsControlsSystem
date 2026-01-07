@@ -1,0 +1,39 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.log
+
+# Virtual environments
+.venv
+.env
+
+# System
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Agent
+.vivus/
+.claude/
+.gemini/
+
+# Frontend / Node
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+coverage/
+frontend/coverage/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
