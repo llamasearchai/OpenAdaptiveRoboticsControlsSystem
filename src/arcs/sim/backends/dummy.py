@@ -23,9 +23,7 @@ class DummyBackend(SimulationEnv):
         self.device = device
         self.config = config
         self.timestep = 0
-        self._action_space = gym.spaces.Box(
-            low=-1.0, high=1.0, shape=(7,), dtype=np.float32
-        )
+        self._action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32)
         self._observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf, shape=(20,), dtype=np.float32
         )
@@ -34,6 +32,11 @@ class DummyBackend(SimulationEnv):
         self.joint_pos = np.zeros(7)
         self.joint_vel = np.zeros(7)
         self.object_pos = np.array([0.5, 0.0, 0.5])
+
+        # Parameter stores
+        self._dynamics_params = {}
+        self._sensor_params = {}
+        self._action_params = {}
 
     def reset(self, seed: Optional[int] = None) -> Observation:
         if seed is not None:
@@ -48,14 +51,23 @@ class DummyBackend(SimulationEnv):
     def step(self, action: np.ndarray) -> Tuple[Observation, float, bool, bool, Dict]:
         self.timestep += 1
 
+        # Apple action noise/latency if configured
+        if self._action_params:
+            if np.random.random() < self._action_params.get("dropout", 0.0):
+                action = self.joint_vel  # Repeat last action
+
+            _latency = self._action_params.get("latency", 0.0)
+            # Simple latency simulation could go here (queue), skipping for now due to state complexity
+
         # Simple integrator dynamics
         self.joint_vel = action  # Velocity control
-        self.joint_pos += self.joint_vel * 0.01  # dt = 0.01
+        self.joint_pos += self.joint_vel * 0.05  # dt = 0.05
+
+        # Enforce joint limits ([-pi, pi])
+        self.joint_pos = np.clip(self.joint_pos, -np.pi, np.pi)
 
         obs = self._get_obs()
-        reward = -np.linalg.norm(
-            self.joint_pos[:3] - self.object_pos
-        )  # Simple reach reward
+        reward = -np.linalg.norm(self.joint_pos[:3] - self.object_pos)  # Simple reach reward
 
         terminated = False
         truncated = self.timestep > 100
@@ -86,6 +98,13 @@ class DummyBackend(SimulationEnv):
 
     def _get_obs(self) -> Observation:
         proprio = np.concatenate([self.joint_pos, self.joint_vel])
+
+        # Apply sensor noise
+        if self._sensor_params:
+            noise_scale = self._sensor_params.get("noise_scale", 0.0)
+            if noise_scale > 0:
+                proprio += np.random.normal(0, noise_scale, size=proprio.shape)
+
         # Pad to match observation space shape if needed, or define obs space dynamically
         extra = np.zeros(self.observation_space.shape[0] - len(proprio))
         full_obs = np.concatenate([proprio, extra])
@@ -98,3 +117,9 @@ class DummyBackend(SimulationEnv):
     def update_dynamics(self, params: Dict[str, float]) -> None:
         # Dummy backend doesn't model dynamics; store params for debugging.
         self._dynamics_params = params
+
+    def update_sensors(self, params: Dict[str, float]) -> None:
+        self._sensor_params = params
+
+    def update_action(self, params: Dict[str, float]) -> None:
+        self._action_params = params

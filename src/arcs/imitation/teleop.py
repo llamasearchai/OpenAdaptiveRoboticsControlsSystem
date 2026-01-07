@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Literal, Any
+from typing import List, Optional, Dict, Any
 import numpy as np
 import time
 from arcs.sim.interfaces import SimulationEnv, Observation
@@ -22,15 +22,39 @@ class TeleoperationInterface:
         self.device = device
         self.control_mode = control_mode
 
-    def read_input(self) -> np.ndarray:
-        """Poll device and return action."""
-        # Setup specific device polling here (Mocked for now)
-        # E.g. read keyboard state or spacemouse
-        return np.random.uniform(-0.1, 0.1, size=(7,))  # Mock small motions
+    def read_input(
+        self, obs: Optional[Observation] = None, goal: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """
+        Poll device and return action.
 
-    def record_demonstration(
-        self, env: SimulationEnv, max_steps: int = 500
-    ) -> Demonstration:
+        Args:
+            obs: Current observation (needed for scripted/expert mode)
+            goal: Current goal (needed for scripted/expert mode)
+        """
+        # If we have obs and goal, act as an 'expert' for data collection testing
+        if obs is not None and goal is not None:
+            # Simple P-controller towards goal
+            current_pos = obs.proprio[:3]
+            error = goal - current_pos
+            action = np.clip(error * 5.0, -1.0, 1.0)
+            # Add slight noise to simulate human imperfection
+            action += np.random.normal(0, 0.05, size=action.shape)
+            # Pad action if necessary (proprio is 7-dim: 3 pos + ? usually 7 dim is joint angles)
+            # Wait, DummyBackend step takes velocity for joints.
+            # If proprio is joint_pos (7), joint_vel (7), then we need 7 dim action.
+            # We need Jacobian for Cartesian control, but for DummyBackend logic:
+            # self.joint_pos += self.joint_vel * 0.01.
+            # And reward is based on joint_pos[:3] distance to goal.
+            # So we can just set 1st 3 joints vel to move towards goal, others 0.
+            full_action = np.zeros(7)
+            full_action[:3] = action
+            return full_action
+
+        # Fallback to random if no state provided
+        return np.random.uniform(-0.1, 0.1, size=(7,))
+
+    def record_demonstration(self, env: SimulationEnv, max_steps: int = 500) -> Demonstration:
         """Record a single episode."""
         obs = env.reset()
         observations = []
